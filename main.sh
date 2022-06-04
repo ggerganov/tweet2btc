@@ -29,7 +29,24 @@ last_btc_updated=$(cat data/last-cmc | jq -r ".data.BTC.quote.USD.last_updated")
 echo "Last BTC price:  $last_btc_price"
 echo "Last BTC update: $last_btc_updated"
 
-curl -H "X-CMC_PRO_API_KEY: $CMC_KEY" -G https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest?symbol=BTC > data/last-cmc
+echo "Querying coinmarketcap.com ..."
+
+nretry=10
+while true ; do
+    curl -H "X-CMC_PRO_API_KEY: $CMC_KEY" -G https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest?symbol=BTC > data/last-cmc
+
+    if grep -q "Gateway Timeout" data/last-cmc ; then
+        nretry=$((nretry-1))
+        echo "Gateway Timeout. Retries left: $nretry"
+        if [ $nretry -eq 0 ] ; then
+            echo "Too many retries. Aborting"
+            exit 1
+        fi
+        sleep 3
+    else
+        break
+    fi
+done
 
 timestamp=$(cat data/last-cmc | jq -r ".status.timestamp")
 cp -v data/last-cmc data/$timestamp
